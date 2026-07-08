@@ -52,22 +52,23 @@ fit_gmm_clusters <- function(data, features, groups = 4, seed = 1, unit_id = "fi
   list(data = out, summary = summary, model = fit)
 }
 
-run_cluster_dml <- function(data,
-                            cluster_col,
-                            outcome,
-                            treatment,
-                            instrument,
-                            covariates,
-                            min_n = 75,
-                            nfolds = 5,
-                            ntree = 500,
-                            seed = 100) {
+run_cluster_local_iv <- function(data,
+                                 cluster_col,
+                                 outcome,
+                                 treatment,
+                                 instrument,
+                                 covariates,
+                                 linear_controls = character(),
+                                 min_n = 75,
+                                 nfolds = 5,
+                                 ntree = 500,
+                                 seed = 100) {
   clusters <- sort(unique(stats::na.omit(data[[cluster_col]])))
   rows <- list()
 
   for (cluster_id in clusters) {
     data_k <- data[data[[cluster_col]] == cluster_id, , drop = FALSE]
-    complete_n <- sum(stats::complete.cases(data_k[, unique(c(outcome, treatment, instrument, covariates)), drop = FALSE]))
+    complete_n <- sum(stats::complete.cases(data_k[, unique(c(outcome, treatment, instrument, covariates, linear_controls)), drop = FALSE]))
     if (complete_n < min_n || length(unique(stats::na.omit(data_k[[instrument]]))) < 2) {
       rows[[as.character(cluster_id)]] <- data.frame(
         cluster = cluster_id,
@@ -81,12 +82,13 @@ run_cluster_dml <- function(data,
       next
     }
 
-    fit <- fit_rf_dml_iv(
+    fit <- fit_rf_local_iv(
       data = data_k,
       outcome = outcome,
       treatment = treatment,
       instrument = instrument,
       covariates = covariates,
+      linear_controls = linear_controls,
       nfolds = nfolds,
       ntree = ntree,
       seed = seed + as.integer(cluster_id)

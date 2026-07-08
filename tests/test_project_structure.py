@@ -12,7 +12,7 @@ class ProjectStructureTests(unittest.TestCase):
             "README.md",
             "DESCRIPTION",
             ".gitignore",
-            "R/dml_iv.R",
+            "R/local_iv.R",
             "R/clustering.R",
             "R/plots.R",
             "R/utils.R",
@@ -36,6 +36,21 @@ class ProjectStructureTests(unittest.TestCase):
         self.assertIn("licensed", text)
         self.assertIn("wrds", text)
         self.assertIn("not included", text)
+
+    def test_main_script_uses_near_cutoff_design(self):
+        text = (ROOT / "scripts" / "run_analysis.R").read_text(encoding="utf-8")
+        self.assertIn("filter_near_cutoff", text)
+        self.assertIn("main_near_cutoff_local_iv.csv", text)
+        old_output_name = "full" + "_sample" + "_dml" + "_iv.csv"
+        self.assertNotIn(old_output_name, text)
+
+    def test_method_note_matches_local_iv_design(self):
+        text = (ROOT / "docs" / "method_note.md").read_text(encoding="utf-8").lower()
+        self.assertIn("local iv", text)
+        self.assertIn("near-cutoff", text)
+        self.assertIn("z_tilde", text)
+        self.assertNotIn("follows a cross-fitted dml-iv workflow", text)
+        self.assertNotIn("e[z | x]", text)
 
 
 if __name__ == "__main__":

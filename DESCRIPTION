@@ -1,8 +1,8 @@
-Package: econ4330DmlIvSample
+Package: econ4330LocalIvSample
 Type: Project
 Title: Passive Ownership and R&D Cuts Coding Sample
 Version: 0.1.0
-Description: Reproducible RF-DML-IV coding sample for a firm-quarter panel.
+Description: Reproducible random-forest local-IV coding sample for a firm-quarter panel.
 License: file LICENSE
 Encoding: UTF-8
 Imports:

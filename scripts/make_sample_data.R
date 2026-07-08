@@ -30,6 +30,9 @@ panel$rank_mktcap <- ifelse(
   sample(751:1000, nrow(panel), replace = TRUE),
   sample(1:250, nrow(panel), replace = TRUE)
 )
+panel$cutoff_running_rank <- ifelse(panel$r1000_dummy == 1, panel$rank_mktcap, 1000 + panel$rank_mktcap)
+panel$distance_to_cutoff <- panel$cutoff_running_rank - 1000
+panel$distance_to_cutoff_sq <- panel$distance_to_cutoff^2
 
 year_trend <- (panel$year - min(years)) / (max(years) - min(years))
 panel$atq <- panel$crsp_mktcap / runif(nrow(panel), 1.5, 3.5)
@@ -49,11 +52,19 @@ panel$cash_ratio <- panel$cheq / panel$atq
 panel$stock_return_volatility <- pmax(0.05, rlnorm(nrow(panel), -2.1, 0.45))
 
 panel$passive_pct_float <- pmin(
-  pmax(0.02 + 0.18 * year_trend - 0.035 * panel$r1000_dummy + 0.03 * log1p(panel$crsp_mktcap) / 10 + rnorm(nrow(panel), 0, 0.025), 0),
+  pmax(
+      0.02 +
+      0.18 * year_trend -
+      0.055 * panel$r1000_dummy +
+      0.015 * panel$distance_to_cutoff / 250 +
+      0.03 * log1p(panel$crsp_mktcap) / 10 +
+      rnorm(nrow(panel), 0, 0.02),
+    0
+  ),
   0.65
 )
 
-true_effect <- -0.45
+true_effect <- -0.55
 panel$xrdq_change <- 0.04 +
   true_effect * panel$passive_pct_float +
   0.25 * panel$leverage -

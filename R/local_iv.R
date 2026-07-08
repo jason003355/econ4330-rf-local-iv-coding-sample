@@ -17,20 +17,22 @@ average_importance <- function(importance_list) {
     dplyr::arrange(dplyr::desc(abs(.data$importance)))
 }
 
-hc1_no_intercept <- function(y, x) {
-  keep <- is.finite(y) & is.finite(x)
+iv_residual_estimate <- function(y, d, z) {
+  keep <- is.finite(y) & is.finite(d) & is.finite(z)
   y <- y[keep]
-  x <- x[keep]
+  d <- d[keep]
+  z <- z[keep]
   n <- length(y)
-  if (n < 3 || sum(x^2) <= 0) {
+  denominator <- sum(z * d)
+  if (n < 3 || abs(denominator) <= .Machine$double.eps) {
     return(data.frame(estimate = NA_real_, std_error = NA_real_, t_stat = NA_real_, p_value = NA_real_, n = n))
   }
 
-  beta <- sum(x * y) / sum(x^2)
-  resid <- y - beta * x
-  meat <- sum((x^2) * (resid^2))
-  bread <- sum(x^2)
-  variance <- (n / (n - 1)) * meat / (bread^2)
+  beta <- sum(z * y) / denominator
+  resid <- y - beta * d
+  moment <- z * resid
+  jacobian <- mean(z * d)
+  variance <- (n / (n - 1)) * mean(moment^2) / (jacobian^2 * n)
   se <- sqrt(variance)
   t_stat <- beta / se
   p_value <- 2 * stats::pt(abs(t_stat), df = n - 1, lower.tail = FALSE)
@@ -38,16 +40,30 @@ hc1_no_intercept <- function(y, x) {
   data.frame(estimate = beta, std_error = se, t_stat = t_stat, p_value = p_value, n = n)
 }
 
-fit_rf_dml_iv <- function(data,
-                          outcome,
-                          treatment,
-                          instrument,
-                          covariates,
-                          nfolds = 5,
-                          ntree = 500,
-                          seed = 1,
-                          winsor_probs = c(0.01, 0.99)) {
-  all_vars <- unique(c(outcome, treatment, instrument, covariates))
+partial_out_linear <- function(x, controls) {
+  if (is.null(controls) || ncol(controls) == 0) {
+    return(x - mean(x, na.rm = TRUE))
+  }
+
+  controls <- as.data.frame(controls)
+  for (v in names(controls)) {
+    controls[[v]] <- safe_numeric(controls[[v]])
+  }
+  design <- stats::model.matrix(~ ., data = controls)
+  as.numeric(stats::lm.fit(x = design, y = x)$residuals)
+}
+
+fit_rf_local_iv <- function(data,
+                            outcome,
+                            treatment,
+                            instrument,
+                            covariates,
+                            linear_controls = character(),
+                            nfolds = 5,
+                            ntree = 500,
+                            seed = 1,
+                            winsor_probs = c(0.01, 0.99)) {
+  all_vars <- unique(c(outcome, treatment, instrument, covariates, linear_controls))
   missing <- setdiff(all_vars, names(data))
   if (length(missing) > 0) {
     stop("Missing columns: ", paste(missing, collapse = ", "), call. = FALSE)
@@ -61,7 +77,7 @@ fit_rf_dml_iv <- function(data,
 
   n <- nrow(model_data)
   if (n < 30) {
-    stop("Too few complete observations for DML-IV: ", n, call. = FALSE)
+    stop("Too few complete observations for local IV: ", n, call. = FALSE)
   }
   if (length(unique(model_data[[instrument]])) < 2) {
     stop("Instrument has insufficient variation.", call. = FALSE)
@@ -70,12 +86,10 @@ fit_rf_dml_iv <- function(data,
   folds <- make_folds(n, nfolds, seed)
   e_y_x <- rep(NA_real_, n)
   e_d_x <- rep(NA_real_, n)
-  e_d_xz <- rep(NA_real_, n)
   y_winsor <- rep(NA_real_, n)
 
   importance_y <- vector("list", max(folds))
   importance_d_x <- vector("list", max(folds))
-  importance_d_xz <- vector("list", max(folds))
 
   for (fold in seq_len(max(folds))) {
     test_idx <- which(folds == fold)
@@ -105,36 +119,38 @@ fit_rf_dml_iv <- function(data,
     )
     e_d_x[test_idx] <- stats::predict(rf_d_x, newdata = test[, covariates, drop = FALSE])
     importance_d_x[[fold]] <- randomForest::importance(rf_d_x)
-
-    covariates_z <- unique(c(instrument, covariates))
-    rf_d_xz <- randomForest::randomForest(
-      x = train[, covariates_z, drop = FALSE],
-      y = train[[treatment]],
-      ntree = ntree,
-      importance = TRUE
-    )
-    e_d_xz[test_idx] <- stats::predict(rf_d_xz, newdata = test[, covariates_z, drop = FALSE])
-    importance_d_xz[[fold]] <- randomForest::importance(rf_d_xz)
   }
 
   resid_y <- y_winsor - e_y_x
-  delta <- e_d_xz - e_d_x
-  estimate <- hc1_no_intercept(resid_y, delta)
+  resid_d <- model_data[[treatment]] - e_d_x
+  instrument_resid <- model_data[[instrument]]
 
-  first_stage <- stats::lm(model_data[[treatment]] ~ delta)
+  if (length(linear_controls) > 0) {
+    smooth_controls <- model_data[, linear_controls, drop = FALSE]
+    resid_y <- partial_out_linear(resid_y, smooth_controls)
+    resid_d <- partial_out_linear(resid_d, smooth_controls)
+    instrument_resid <- partial_out_linear(instrument_resid, smooth_controls)
+  } else {
+    instrument_resid <- partial_out_linear(instrument_resid, NULL)
+  }
+
+  estimate <- iv_residual_estimate(resid_y, resid_d, instrument_resid)
+
+  first_stage <- stats::lm(resid_d ~ instrument_resid)
   first_stage_summary <- summary(first_stage)
-  estimate$first_stage_slope <- unname(stats::coef(first_stage)[["delta"]])
+  estimate$first_stage_slope <- unname(stats::coef(first_stage)[["instrument_resid"]])
   estimate$first_stage_f <- unname(first_stage_summary$fstatistic[["value"]])
-  estimate$mean_abs_delta <- mean(abs(delta), na.rm = TRUE)
-  estimate$sd_delta <- stats::sd(delta, na.rm = TRUE)
+  estimate$mean_abs_instrument_resid <- mean(abs(instrument_resid), na.rm = TRUE)
+  estimate$sd_instrument_resid <- stats::sd(instrument_resid, na.rm = TRUE)
+  estimate$mean_abs_resid_d <- mean(abs(resid_d), na.rm = TRUE)
 
   predictions <- data.frame(
     y_winsor = y_winsor,
     e_y_x = e_y_x,
     e_d_x = e_d_x,
-    e_d_xz = e_d_xz,
     resid_y = resid_y,
-    delta = delta
+    resid_d = resid_d,
+    instrument_resid = instrument_resid
   )
 
   list(
@@ -142,7 +158,6 @@ fit_rf_dml_iv <- function(data,
     predictions = predictions,
     importance_y = average_importance(importance_y),
     importance_d_x = average_importance(importance_d_x),
-    importance_d_xz = average_importance(importance_d_xz),
     n_complete = n
   )
 }

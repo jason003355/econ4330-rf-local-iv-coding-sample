@@ -20,25 +20,19 @@ plot_passive_cutoff <- function(data, output_path, bandwidth = 250, bin_width = 
     return(invisible(NULL))
   }
 
-  data_rd <- data |>
+  data_rd <- construct_cutoff_running(data) |>
     dplyr::mutate(
-      running = dplyr::case_when(
-        .data$russell_index == "R1000" ~ safe_numeric(.data$rank_mktcap),
-        .data$russell_index == "R2000" ~ 1000 + safe_numeric(.data$rank_mktcap),
-        TRUE ~ NA_real_
-      ),
       passive_pct_float = safe_numeric(.data$passive_pct_float)
     ) |>
     dplyr::filter(
-      is.finite(.data$running),
+      is.finite(.data$cutoff_running_rank),
       is.finite(.data$passive_pct_float),
-      .data$running >= 1000 - bandwidth,
-      .data$running <= 1000 + bandwidth
+      abs(.data$distance_to_cutoff) <= bandwidth
     ) |>
-    dplyr::mutate(bin = floor(.data$running / bin_width) * bin_width) |>
+    dplyr::mutate(bin = floor(.data$cutoff_running_rank / bin_width) * bin_width) |>
     dplyr::group_by(.data$bin) |>
     dplyr::summarise(
-      running_mid = mean(.data$running, na.rm = TRUE),
+      running_mid = mean(.data$cutoff_running_rank, na.rm = TRUE),
       passive_mean = mean(.data$passive_pct_float, na.rm = TRUE),
       n = dplyr::n(),
       .groups = "drop"

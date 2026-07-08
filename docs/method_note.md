@@ -1,48 +1,67 @@
 # Method Note
 
-The empirical target is the effect of passive ownership on firms' R&D cuts when firms
-face short-term pressure. The original project used the Russell 1000/2000 cutoff as an
-instrument for passive mutual fund ownership.
+The empirical question is whether passive ownership predicts smaller R&D cuts among
+firms close to the Russell 1000/2000 assignment cutoff. The design uses index
+assignment as a source of variation in passive mutual fund ownership.
 
-The implementation follows a cross-fitted DML-IV workflow. Let `Y` be the R&D cut
-measure, `D` be passive ownership, `Z` be the Russell assignment instrument, and `X`
-be firm controls plus industry and year dummies. The target is the local effect of
-passive ownership for the variation in `D` induced by `Z` near the Russell cutoff.
+## Near-Cutoff Sample
 
-The score implemented here uses the random-forest estimate of the conditional first
-stage,
+The script constructs a running variable from the within-index market-cap rank:
 
 ```text
-Delta(X, Z) = E[D | X, Z] - E[D | X],
+running = rank_mktcap                    for Russell 1000 observations
+running = 1000 + rank_mktcap             for Russell 2000 observations
+distance_to_cutoff = running - 1000
 ```
 
-as the instrument-induced component of passive ownership. The final coefficient is
-estimated from the no-intercept moment
+The default analysis keeps observations with `abs(distance_to_cutoff) <= 150`.
+The final IV moment partials out `distance_to_cutoff` and `distance_to_cutoff_sq`
+linearly. The random-forest nuisance models use firm controls, industry dummies, and
+year dummies.
+
+## Local IV Moment
+
+Let `Y` be the R&D cut measure, `D` be passive ownership, `Z` be the Russell 1000
+assignment indicator, `X` be firm controls and fixed effects, and `S` be the smooth
+running-variable controls. The implementation uses cross-fitted random forests to
+estimate two nuisance functions:
 
 ```text
-E[(Y - E[Y | X] - beta * Delta(X, Z)) * Delta(X, Z)] = 0.
+E[Y | X]
+E[D | X]
 ```
 
-This is a compact implementation suitable for a coding sample. A paper-grade version
-would report a fuller DML-IV specification, sensitivity to alternative learners, and
-firm-clustered or two-way clustered inference.
+The code first forms random-forest residuals:
 
-Workflow:
+```text
+Y_star = Y - E[Y | X]
+D_star = D - E[D | X].
+```
 
-1. Split the sample into folds.
-2. Fit a random forest for the outcome using controls only, producing `E[Y | X]`.
-3. Fit a random forest for passive ownership using controls only, producing `E[D | X]`.
-4. Fit a random forest for passive ownership using controls and the instrument,
-   producing `E[D | X, Z]`.
-5. Regress the residualized outcome `Y - E[Y | X]` on
-   `E[D | X, Z] - E[D | X]` without an intercept.
+It then linearly partials out the smooth running controls `S` from `Y_star`, `D_star`,
+and `Z`, producing `Y_tilde`, `D_tilde`, and `Z_tilde`. The final coefficient solves
+the IV moment
 
-The cluster extension first aggregates firm-quarter characteristics to the firm level,
-groups firms with a Gaussian mixture model, maps the firm labels back to firm-quarter
-observations, and then runs the same RF-DML-IV procedure within each cluster. These
-cluster-level estimates should be interpreted as exploratory heterogeneity analysis,
-especially when a cluster has a small sample size.
+```text
+E[Z_tilde * (Y_tilde - beta * D_tilde)] = 0.
+```
 
-The code writes first-stage proxy diagnostics alongside the treatment-effect estimate:
-the slope and F-statistic from `D ~ Delta`, plus the mean and standard deviation of
-`Delta`.
+Equivalently, the code instruments residualized passive ownership with the cutoff
+assignment after removing smooth running-variable trends. The code does not use a
+flexible learner to residualize the assignment indicator. In a cutoff design,
+assignment is mechanically tied to the side of the running variable, so overfitting
+`Z` can absorb the discontinuity that identifies the local first stage.
+
+The output reports the coefficient, an observation-level robust standard error for
+the IV moment, and first-stage proxy diagnostics from `D_tilde ~ Z_tilde`.
+
+## Scope And Limits
+
+This compact implementation is designed for a coding sample. A paper-grade empirical
+analysis should report sensitivity to alternative bandwidths, alternative learners,
+clustered or two-way clustered inference, and a fuller IV specification.
+
+The cluster extension aggregates firm-quarter characteristics to the firm level,
+groups firms with a Gaussian mixture model, maps firm labels back to firm-quarter
+observations, and runs the same near-cutoff procedure within each cluster. These
+cluster-level estimates should be interpreted as exploratory heterogeneity analysis.
