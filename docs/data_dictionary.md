@@ -1,0 +1,28 @@
+# Data Dictionary
+
+The analysis expects a firm-quarter panel with one row per firm-quarter.
+
+## Core Columns
+
+| Column | Description |
+| --- | --- |
+| `firm_id` | Firm identifier used for synthetic data and diagnostics |
+| `permno` | CRSP PERMNO or synthetic equivalent |
+| `qdate` | Quarter-end date |
+| `year` | Calendar year |
+| `russell_index` | `R1000` or `R2000` |
+| `rank_mktcap` | Within-index market-cap rank near the cutoff |
+| `r1000_dummy` | Instrument equal to 1 for Russell 1000 observations |
+| `passive_pct_float` | Passive mutual fund ownership as share of float |
+| `xrdq_change` | R&D cut/change measure used as the outcome |
+
+## Controls
+
+The baseline controls are:
+
+`atq`, `saleq`, `seqq`, `cheq`, `leverage`, `cf`, `rd_intensity`,
+`sales_growth`, `log_analyst_coverage`, `BM`, `net_income_q`, `ROA`, `ROE`,
+`cash_ratio`, and `stock_return_volatility`.
+
+The script also uses any columns beginning with `sic2_` as industry fixed-effect
+dummies and any columns beginning with `year_` as year fixed-effect dummies.
