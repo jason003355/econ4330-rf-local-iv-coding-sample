@@ -3,6 +3,7 @@
 .Rproj.user/
 
 data/raw/
+data/sample_panel.csv
 data/*.xlsx
 data/*.xls
 

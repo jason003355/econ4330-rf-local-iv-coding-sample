@@ -31,8 +31,7 @@ licensed data are not included.
 |   |-- make_sample_data.R
 |   `-- run_analysis.R
 |-- data/
-|   |-- README.md
-|   `-- sample_panel.csv
+|   `-- README.md
 |-- docs/
 |   |-- data_dictionary.md
 |   `-- method_note.md
@@ -44,7 +43,8 @@ licensed data are not included.
 
 ## Quick Start
 
-Install the R packages listed in `DESCRIPTION`, then run:
+Install the R packages listed in `DESCRIPTION`, then generate a local synthetic
+panel and run the default analysis:
 
 ```bash
 Rscript scripts/make_sample_data.R
@@ -56,6 +56,14 @@ change the bandwidth:
 
 ```bash
 Rscript scripts/run_analysis.R --input data/sample_panel.csv --output outputs/sample_run --bandwidth 100
+```
+
+The default control set is `core`. To run a sparse first-stage diagnostic
+specification or the expanded control set:
+
+```bash
+Rscript scripts/run_analysis.R --input data/sample_panel.csv --output outputs/minimal_run --control-set minimal
+Rscript scripts/run_analysis.R --input data/sample_panel.csv --output outputs/full_run --control-set full
 ```
 
 ## Key Outputs
@@ -76,15 +84,16 @@ a smaller value of the synthetic R&D-cut outcome.
 
 ## Running On Real Data
 
-Place a licensed local panel file at `data/raw/panel_real.csv` with the columns listed
-in `docs/data_dictionary.md`, then run:
+Place a licensed local panel file at `data/raw/panel_real.csv` or
+`data/raw/panel_real.xlsx` with the columns listed in `docs/data_dictionary.md`,
+then run:
 
 ```bash
 Rscript scripts/run_analysis.R --input data/raw/panel_real.csv --output outputs/real_run
 ```
 
-The `data/raw/` directory and Excel files are ignored by Git to avoid publishing
-licensed WRDS data.
+The `data/raw/` directory, local Excel files, generated CSVs, and outputs are ignored
+by Git to avoid publishing licensed WRDS data.
 
 ## Method Scope
 

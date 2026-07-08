@@ -1,4 +1,4 @@
-required_packages <- c("dplyr", "ggplot2", "mclust", "randomForest", "readr", "tidyr")
+required_packages <- c("dplyr", "ggplot2", "mclust", "randomForest", "readr", "readxl", "tidyr")
 
 check_packages <- function(packages = required_packages) {
   missing <- packages[!vapply(packages, requireNamespace, logical(1), quietly = TRUE)]
@@ -42,7 +42,13 @@ make_folds <- function(n, nfolds, seed) {
 parse_cli_args <- function(default_input = "data/sample_panel.csv",
                            default_output = "outputs/sample_run") {
   args <- commandArgs(trailingOnly = TRUE)
-  out <- list(input = default_input, output = default_output, ntree = 150, bandwidth = 150)
+  out <- list(
+    input = default_input,
+    output = default_output,
+    ntree = 150,
+    bandwidth = 150,
+    control_set = "core"
+  )
 
   i <- 1
   while (i <= length(args)) {
@@ -64,6 +70,12 @@ parse_cli_args <- function(default_input = "data/sample_panel.csv",
         stop("--bandwidth must be a positive number.", call. = FALSE)
       }
       i <- i + 2
+    } else if (args[[i]] == "--control-set" && i < length(args)) {
+      out$control_set <- args[[i + 1]]
+      if (!out$control_set %in% c("minimal", "core", "full")) {
+        stop("--control-set must be one of: minimal, core, full.", call. = FALSE)
+      }
+      i <- i + 2
     } else {
       stop("Unknown or incomplete argument: ", args[[i]], call. = FALSE)
     }
@@ -78,6 +90,41 @@ ensure_dir <- function(path) {
   }
 }
 
+read_analysis_data <- function(path) {
+  if (!file.exists(path)) {
+    stop("Input file does not exist: ", path, call. = FALSE)
+  }
+
+  extension <- tolower(tools::file_ext(path))
+  data <- switch(
+    extension,
+    csv = readr::read_csv(path, show_col_types = FALSE),
+    xls = readxl::read_excel(path),
+    xlsx = readxl::read_excel(path),
+    stop("Unsupported input file type: .", extension, call. = FALSE)
+  )
+
+  standardize_panel_schema(as.data.frame(data))
+}
+
+standardize_panel_schema <- function(data) {
+  out <- data
+
+  if (!("firm_id" %in% names(out))) {
+    if ("permno" %in% names(out)) {
+      out$firm_id <- as.character(out$permno)
+    } else if ("gvkey" %in% names(out)) {
+      out$firm_id <- as.character(out$gvkey)
+    }
+  }
+
+  if (!("BM" %in% names(out)) && "bm" %in% names(out)) {
+    out$BM <- out$bm
+  }
+
+  out
+}
+
 required_columns <- function(base_controls, data) {
   c(
     "xrdq_change",
@@ -87,6 +134,26 @@ required_columns <- function(base_controls, data) {
     grep("^sic2_", names(data), value = TRUE),
     grep("^year_", names(data), value = TRUE)
   )
+}
+
+select_covariates <- function(data, control_set = "core") {
+  minimal_controls <- c("atq", "saleq", "seqq", "cheq", "leverage", "cf", "rd_intensity")
+  core_controls <- c(minimal_controls, "sales_growth", "BM", "ROA", "cash_ratio")
+  full_controls <- c(
+    core_controls,
+    "log_analyst_coverage", "net_income_q", "ROE", "stock_return_volatility",
+    "surprise_eps", "numest", "past_3yr_miss_rate", "tech_dummy"
+  )
+
+  controls <- switch(
+    control_set,
+    minimal = minimal_controls,
+    core = core_controls,
+    full = c(full_controls, grep("^sic2_", names(data), value = TRUE), grep("^year_", names(data), value = TRUE)),
+    stop("Unknown control set: ", control_set, call. = FALSE)
+  )
+
+  intersect(controls, names(data))
 }
 
 construct_cutoff_running <- function(data) {

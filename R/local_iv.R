@@ -73,7 +73,9 @@ fit_rf_local_iv <- function(data,
   for (v in all_vars) {
     model_data[[v]] <- safe_numeric(model_data[[v]])
   }
-  model_data <- model_data[stats::complete.cases(model_data), , drop = FALSE]
+  finite_rows <- stats::complete.cases(model_data) &
+    Reduce(`&`, lapply(model_data, is.finite))
+  model_data <- model_data[finite_rows, , drop = FALSE]
 
   n <- nrow(model_data)
   if (n < 30) {

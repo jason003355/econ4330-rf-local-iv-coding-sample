@@ -10,15 +10,10 @@ ensure_dir(args$output)
 ensure_dir(file.path(args$output, "tables"))
 ensure_dir(file.path(args$output, "figures"))
 
-data <- readr::read_csv(args$input, show_col_types = FALSE)
+data <- read_analysis_data(args$input)
 analysis_data <- filter_near_cutoff(data, bandwidth = args$bandwidth)
 
-base_controls <- c(
-  "atq", "saleq", "seqq", "cheq", "leverage", "cf", "rd_intensity",
-  "sales_growth", "log_analyst_coverage", "BM", "net_income_q",
-  "ROA", "ROE", "cash_ratio", "stock_return_volatility"
-)
-covariates <- setdiff(required_columns(base_controls, analysis_data), c("xrdq_change", "passive_pct_float", "r1000_dummy"))
+covariates <- select_covariates(analysis_data, args$control_set)
 linear_controls <- c("distance_to_cutoff", "distance_to_cutoff_sq")
 
 readr::write_csv(
