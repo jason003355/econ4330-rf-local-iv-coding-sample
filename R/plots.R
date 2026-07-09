@@ -8,7 +8,7 @@ plot_outcome_distribution <- function(data, output_path) {
     ggplot2::geom_histogram(ggplot2::aes(y = ggplot2::after_stat(density)), bins = 40) +
     ggplot2::geom_density() +
     ggplot2::geom_vline(xintercept = 0, linetype = "dashed") +
-    ggplot2::labs(x = "R&D cut ratio", y = "Density") +
+    ggplot2::labs(x = "R&D change", y = "Density") +
     ggplot2::theme_minimal()
 
   ggplot2::ggsave(output_path, p, width = 7, height = 4.5)

@@ -1,6 +1,6 @@
 # Method Note
 
-The empirical question is whether passive ownership predicts smaller R&D cuts among
+The empirical question is whether passive ownership predicts smoother R&D adjustment among
 firms close to the Russell 1000/2000 assignment cutoff. The design uses index
 assignment as a source of variation in passive mutual fund ownership.
 
@@ -15,13 +15,15 @@ distance_to_cutoff = running - 1000
 ```
 
 The default analysis keeps observations with `abs(distance_to_cutoff) <= 150`.
-The final IV moment partials out `distance_to_cutoff` and `distance_to_cutoff_sq`
-linearly. The random-forest nuisance models use firm controls, industry dummies, and
-year dummies.
+The final IV moment partials out `distance_to_cutoff` and
+`distance_to_cutoff * R1000` linearly, allowing different local slopes on the two
+sides of the cutoff. The default `core` specification uses firm-level accounting
+and market controls. The expanded `full` specification also includes available
+industry and year dummies.
 
 ## Local IV Moment
 
-Let `Y` be the R&D cut measure, `D` be passive ownership, `Z` be the Russell 1000
+Let `Y` be the R&D adjustment measure, `D` be passive ownership, `Z` be the Russell 1000
 assignment indicator, `X` be firm controls and fixed effects, and `S` be the smooth
 running-variable controls. The implementation uses cross-fitted random forests to
 estimate two nuisance functions:
@@ -55,13 +57,24 @@ assignment is mechanically tied to the side of the running variable, so overfitt
 The output reports the coefficient, an observation-level robust standard error for
 the IV moment, and first-stage proxy diagnostics from `D_tilde ~ Z_tilde`.
 
+## Specification Grid
+
+`scripts/run_specification_grid.R` complements the RF local-IV workflow with
+paper-style diagnostics. It estimates side-specific local OLS, reduced-form,
+first-stage, and IV specifications across bandwidths, outcome definitions, and
+control sets. These estimates use firm-clustered standard errors and are intended
+to make weak-instrument, small-sample, and robustness issues visible inside the
+output table. The grid includes optional subgroup rows only when a subgroup has
+enough observations and is not identical to the full near-cutoff sample.
+
 ## Scope And Limits
 
 This compact implementation is designed for a coding sample. A paper-grade empirical
 analysis should report sensitivity to alternative bandwidths, alternative learners,
-clustered or two-way clustered inference, and a fuller IV specification.
+clustered or two-way clustered inference, and first-stage strength.
 
-The cluster extension aggregates firm-quarter characteristics to the firm level,
-groups firms with a Gaussian mixture model, maps firm labels back to firm-quarter
-observations, and runs the same near-cutoff procedure within each cluster. These
-cluster-level estimates should be interpreted as exploratory heterogeneity analysis.
+The cluster extension aggregates firm-quarter characteristics to robust firm-level
+median profiles, groups firms with a Gaussian mixture model, maps firm labels back
+to firm-quarter observations, and runs the same near-cutoff procedure within each
+cluster. These cluster-level estimates should be interpreted as exploratory
+heterogeneity analysis.

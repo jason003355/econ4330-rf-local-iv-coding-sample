@@ -1,6 +1,6 @@
 Package: econ4330LocalIvSample
 Type: Project
-Title: Passive Ownership and R&D Cuts Coding Sample
+Title: Passive Ownership and R&D Adjustment Coding Sample
 Version: 0.1.0
 Description: Reproducible random-forest local-IV coding sample for a firm-quarter panel.
 License: file LICENSE

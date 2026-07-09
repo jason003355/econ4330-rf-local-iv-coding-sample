@@ -1,6 +1,7 @@
 source("R/utils.R")
 check_packages()
 
+source("R/data_prep.R")
 source("R/local_iv.R")
 source("R/clustering.R")
 source("R/plots.R")
@@ -14,7 +15,7 @@ data <- read_analysis_data(args$input)
 analysis_data <- filter_near_cutoff(data, bandwidth = args$bandwidth)
 
 covariates <- select_covariates(analysis_data, args$control_set)
-linear_controls <- c("distance_to_cutoff", "distance_to_cutoff_sq")
+linear_controls <- c("distance_to_cutoff", "distance_x_r1000")
 
 readr::write_csv(
   cutoff_sample_summary(analysis_data, bandwidth = args$bandwidth),

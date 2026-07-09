@@ -19,3 +19,4 @@ jobs:
       - run: Rscript -e 'install.packages(c("dplyr","ggplot2","mclust","randomForest","readr","readxl","tidyr"), repos="https://cloud.r-project.org")'
       - run: Rscript scripts/make_sample_data.R
       - run: Rscript scripts/run_analysis.R --input data/sample_panel.csv --output outputs/ci_run --ntree 25
+      - run: Rscript scripts/run_specification_grid.R --input data/sample_panel.csv --output outputs/ci_grid

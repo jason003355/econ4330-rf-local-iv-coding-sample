@@ -6,9 +6,9 @@ fit_gmm_clusters <- function(data, features, groups = 4, seed = 1, unit_id = "fi
 
   if (unit_id %in% names(data)) {
     cluster_source <- data |>
-      dplyr::mutate(dplyr::across(dplyr::all_of(features), safe_numeric)) |>
+      dplyr::mutate(dplyr::across(dplyr::all_of(features), finite_numeric)) |>
       dplyr::group_by(.data[[unit_id]]) |>
-      dplyr::summarise(dplyr::across(dplyr::all_of(features), ~ mean(.x, na.rm = TRUE)), .groups = "drop")
+      dplyr::summarise(dplyr::across(dplyr::all_of(features), median_finite), .groups = "drop")
   } else {
     cluster_source <- data[, features, drop = FALSE]
     cluster_source$row_id_for_clustering <- seq_len(nrow(cluster_source))
@@ -17,10 +17,11 @@ fit_gmm_clusters <- function(data, features, groups = 4, seed = 1, unit_id = "fi
 
   cluster_data <- cluster_source[, features, drop = FALSE]
   for (v in features) {
-    cluster_data[[v]] <- safe_numeric(cluster_data[[v]])
+    cluster_data[[v]] <- finite_numeric(cluster_data[[v]])
   }
 
-  keep <- stats::complete.cases(cluster_data)
+  keep <- stats::complete.cases(cluster_data) &
+    Reduce(`&`, lapply(cluster_data, is.finite))
   x <- scale(as.matrix(cluster_data[keep, , drop = FALSE]))
   x[!is.finite(x)] <- 0
 
@@ -45,7 +46,7 @@ fit_gmm_clusters <- function(data, features, groups = 4, seed = 1, unit_id = "fi
     dplyr::group_by(.data$gmm_cluster) |>
     dplyr::summarise(
       n = dplyr::n(),
-      dplyr::across(dplyr::all_of(features), ~ mean(safe_numeric(.x), na.rm = TRUE)),
+      dplyr::across(dplyr::all_of(features), median_finite),
       .groups = "drop"
     )
 

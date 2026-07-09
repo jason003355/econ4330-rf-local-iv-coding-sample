@@ -1,7 +1,7 @@
-# Passive Ownership and R&D Cuts
+# Passive Ownership and R&D Adjustment
 
 This repository is a compact Predoc coding sample for an empirical finance question:
-does passive mutual fund ownership predict smaller R&D cuts among firms near the
+does passive mutual fund ownership predict smoother R&D adjustment among firms near the
 Russell 1000/2000 assignment cutoff?
 
 The public repository uses synthetic data with the same schema as the restricted
@@ -15,6 +15,8 @@ licensed data are not included.
 - Construction of a Russell 1000/2000 near-cutoff sample
 - Random-forest nuisance models with cross-fitting
 - A local-IV final stage with random-forest residualization of outcome and treatment
+- A transparent side-specific local linear IV and OLS specification grid with
+  firm-clustered standard errors
 - Firm-level Gaussian mixture clustering for exploratory heterogeneity
 - Reproducible scripts, generated outputs, and CI checks
 
@@ -24,12 +26,15 @@ licensed data are not included.
 .
 |-- R/
 |   |-- clustering.R
+|   |-- data_prep.R
+|   |-- linear_iv.R
 |   |-- local_iv.R
 |   |-- plots.R
 |   `-- utils.R
 |-- scripts/
 |   |-- make_sample_data.R
-|   `-- run_analysis.R
+|   |-- run_analysis.R
+|   `-- run_specification_grid.R
 |-- data/
 |   `-- README.md
 |-- docs/
@@ -66,6 +71,12 @@ Rscript scripts/run_analysis.R --input data/sample_panel.csv --output outputs/mi
 Rscript scripts/run_analysis.R --input data/sample_panel.csv --output outputs/full_run --control-set full
 ```
 
+For paper-style diagnostics across bandwidths, outcomes, and control sets:
+
+```bash
+Rscript scripts/run_specification_grid.R --input data/sample_panel.csv --output outputs/spec_grid
+```
+
 ## Key Outputs
 
 The analysis writes tables and figures under `outputs/sample_run/`:
@@ -75,12 +86,13 @@ The analysis writes tables and figures under `outputs/sample_run/`:
 - `tables/main_near_cutoff_local_iv.csv`: main coefficient, an IV-moment robust
   standard error, and first-stage proxy diagnostics.
 - `tables/cluster_local_iv.csv`: exploratory estimates by firm-level GMM cluster.
+- `tables/local_linear_iv_grid.csv`: local OLS, reduced-form, first-stage, and IV
+  estimates from `run_specification_grid.R`, with firm-clustered standard errors
+  plus weak-first-stage and small-sample flags.
 - `figures/passive_cutoff.png`: binned passive ownership around the Russell cutoff.
 - `figures/importance_*.png`: random-forest variable-importance diagnostics.
 
-The synthetic-data coefficient is a workflow check, not an empirical finding. On the
-generated sample, a negative coefficient means that higher passive ownership predicts
-a smaller value of the synthetic R&D-cut outcome.
+The synthetic-data coefficient is a workflow check, not an empirical finding.
 
 ## Running On Real Data
 
@@ -90,6 +102,7 @@ then run:
 
 ```bash
 Rscript scripts/run_analysis.R --input data/raw/panel_real.csv --output outputs/real_run
+Rscript scripts/run_specification_grid.R --input data/raw/panel_real.csv --output outputs/real_grid
 ```
 
 The `data/raw/` directory, local Excel files, generated CSVs, and outputs are ignored
@@ -105,9 +118,12 @@ assignment.
 
 The identification claim should stay narrow in applications. The Russell design is
 most credible close to the cutoff, so the default script filters to that sample and
-controls for smooth distance-to-cutoff trends. The reported standard errors are
-observation-level robust standard errors for the IV moment; a paper version should
-add firm-level or two-way clustered inference.
+controls for smooth distance-to-cutoff trends. The RF local-IV output is primarily
+for coding-sample demonstration. The specification-grid script is the more
+transparent place to evaluate paper-style first-stage strength, reduced-form
+patterns, OLS associations, small-sample sensitivity, and firm-clustered
+uncertainty. Optional subgroup rows are included only when the subgroup has enough
+observations and differs from the full near-cutoff sample.
 
 Cluster-level estimates are exploratory. They show how the workflow can be extended
 to heterogeneity analysis, but small clusters can produce unstable coefficients.
@@ -126,4 +142,5 @@ hard-coded absolute paths, local Excel files, and manual intermediate files.
 - `mclust` 6.1.2
 - `randomForest` 4.7.1.2
 - `readr` 2.1.5
+- `readxl` 1.4.5
 - `tidyr` 1.3.1
